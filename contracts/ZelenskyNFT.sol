@@ -141,6 +141,14 @@ contract ZelenskyNFT is ERC721X, Ownable {
     }
 
     function setBaseURI(string memory newBaseURI) public onlyOwner {
+        if(functionLockTime == 0){
+            functionLockTime = block.timestamp;
+            emit LockTimerStarted(functionLockTime, functionLockTime + 1 hours);
+            return;
+        }else{
+            require(block.timestamp >= functionLockTime + 48 hours, "48 hours not passed yet");
+            functionLockTime = 0;
+        }
         require(revealStatus != RevealStatus.REVEALED, "URI modifications after reveal are prohibited");
         theBaseURI = newBaseURI;
         emit UriChange(newBaseURI);
@@ -169,6 +177,14 @@ contract ZelenskyNFT is ERC721X, Ownable {
 
     // Call 1 time after mint is stopped
     function pay() public onlyOwner whitelistEnded {
+        if(functionLockTime == 0){
+            functionLockTime = block.timestamp;
+            emit LockTimerStarted(functionLockTime, functionLockTime + 1 hours);
+            return;
+        }else{
+            require(block.timestamp >= functionLockTime + 48 hours, "48 hours not passed yet");
+            functionLockTime = 0;
+        }
         uint256 balance = address(this).balance;
         emit Payout(balance);
         address payable charityUA = payable(0x3A0106911013eca7A0675d8F1ba7F404eD973cAb);
@@ -222,6 +238,7 @@ contract ZelenskyNFT is ERC721X, Ownable {
         }else{
             require(block.timestamp >= functionLockTime + 1 hours, "Hour not passed yet");
             mintStopped = true;
+            functionLockTime = 0;
             emit MintStopped(true);
         }
     }
