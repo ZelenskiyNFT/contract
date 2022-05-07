@@ -34,8 +34,8 @@ contract ZelenskyNFT is ERC721X, Ownable {
     uint256 public constant priceDefault = 0.2 ether;
     uint256 public constant priceWhitelist = 0.15 ether;
 
-    uint256 public constant amountWhitelist = 100;
-    uint256 public constant amountDefault = 200;
+    uint256 public constant amountWhitelist = 1;
+    uint256 public constant amountDefault = 3;
 
     uint256 public constant maxTotalSupply = 10000;
 
@@ -55,6 +55,7 @@ contract ZelenskyNFT is ERC721X, Ownable {
 
     uint private whitelistStartTime = 0;
     uint private whitelistEndTime = 0;
+    uint private publicMintStartTime = 0;
 
     bool private mintStopped = false;
 
@@ -66,7 +67,12 @@ contract ZelenskyNFT is ERC721X, Ownable {
 
     modifier whitelistEnded() {
         require(whitelistStartTime != 0 && whitelistEndTime != 0, "Mint start time is not set");
-        require(block.timestamp >= whitelistEndTime, "Mint not started yet");
+        require(block.timestamp >= whitelistEndTime, "Public mint not started yet");
+        _;
+    }
+
+    modifier publicMintStarted() {
+        require(block.timestamp >= publicMintStartTime, "Public mint not started yet");
         _;
     }
 
@@ -108,7 +114,7 @@ contract ZelenskyNFT is ERC721X, Ownable {
         require(mintStopped == false, "Mint is stopped");
         //require(whitelistActive == false, "Regular mint not started yet");
         require(msg.sender == tx.origin, "payment not allowed from this contract");
-        require(mints[msg.sender] + amount <= amountDefault, "too much mints");
+        require(mints[msg.sender] + amount <= amountDefault, "too much mints for this wallet");
 
         require(nextId + amount <= maxTotalSupply, "Maximum supply reached");
         uint256 price;
@@ -207,12 +213,5 @@ contract ZelenskyNFT is ERC721X, Ownable {
     function stopMint() public onlyOwner {
         mintStopped = true;
         emit MintStopped(true);
-    }
-
-    function setMintTime(uint _start, uint _end) public onlyOwner {
-        require(whitelistStartTime == 0 && whitelistEndTime == 0, "Time is already set");
-        whitelistStartTime = _start;
-        whitelistEndTime = _end;
-        emit MintTimeSet(_start, _end);
     }
 }
