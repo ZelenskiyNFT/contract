@@ -39,7 +39,7 @@ contract ZelenskyNFT is ERC721X, Ownable {
 
     uint256 private charitySum = 0;
     uint256 private teamSum = 0;
-    uint256 private saleSumm = 0;
+    uint256 private saleSum = 0;
 
     mapping(address => uint256) private mints;
     mapping(address => bool) private whitelistClaimed;
@@ -71,7 +71,7 @@ contract ZelenskyNFT is ERC721X, Ownable {
         
         mints[msg.sender] += amount;
 
-        saleSumm += msg.value;
+        saleSum += msg.value;
 
         whitelistClaimed[msg.sender] = true;
 
@@ -92,7 +92,7 @@ contract ZelenskyNFT is ERC721X, Ownable {
 
         mints[msg.sender] += amount;
 
-        saleSumm += msg.value;
+        saleSum += msg.value;
 
         _mint(msg.sender, amount);
     }
