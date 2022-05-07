@@ -188,12 +188,4 @@ contract ZelenskyNFT is ERC721X, Ownable {
         mintStarted = false;
         emit MintStatusChange(false);
     }
-
-    function getPublicMintPrice() public pure returns (uint256) {
-        return priceDefault;
-    }
-
-    function getPrivateMintPrice() public pure returns (uint256) {
-        return priceWhitelist;
-    }
 }
