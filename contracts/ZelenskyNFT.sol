@@ -23,7 +23,7 @@ contract ZelenskyNFT is ERC721X, Ownable {
     event Withdrawal(address indexed _to, uint256 _value, bytes data);
     event UriChange(string newURI);
     event WhitelistStatusChange(bool status);
-    event MintStatusChange(bool status);
+    event MintStopped(bool status);
     event NewRoot(bytes32 root);
     event Payout(uint256 amount);
     event Refund(address indexed _to, uint256 amount, bytes data);
@@ -35,9 +35,6 @@ contract ZelenskyNFT is ERC721X, Ownable {
 
     uint256 public constant amountWhitelist = 100;
     uint256 public constant amountDefault = 200;
-
-    bool private whitelistActive = false;
-    bool private mintStarted = false;
 
     uint256 public constant maxTotalSupply = 10000;
 
@@ -51,15 +48,30 @@ contract ZelenskyNFT is ERC721X, Ownable {
     mapping(address => bool) private whitelistClaimed;
 
     bytes32 private root;
+    bool private rootIsSet = false;
 
     RevealStatus revealStatus = RevealStatus.MINT;
 
+    uint private whitelistStartTime = 0;
+    uint private whitelistEndTime = 0;
+
+    bool private mintStopped = false;
+
+    modifier whitelistActive() {
+        require(whitelistStartTime != 0 && whitelistEndTime != 0, "Mint start time is not set");
+        require(block.timestamp >= whitelistStartTime && block.timestamp <= whitelistEndTime, "Mint not started yet");
+        _;
+    }
+
+    modifier whitelistEnded() {
+        require(whitelistStartTime != 0 && whitelistEndTime != 0, "Mint start time is not set");
+        require(block.timestamp >= whitelistEndTime, "Mint not started yet");
+        _;
+    }
+
     //, uint256 _startTime, bytes32[] memory _proof
 
-    function buy(uint256 amount, bytes32[] calldata _proof) public payable {
-        require(whitelistActive, "Whitelist not active");
-        require(mintStarted, "Mint not started yet");
-
+    function buy(uint256 amount, bytes32[] calldata _proof) public payable whitelistActive {
         require(msg.sender == tx.origin, "payment not allowed from contract");
 
         bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
@@ -91,9 +103,9 @@ contract ZelenskyNFT is ERC721X, Ownable {
         _mint(msg.sender, amount);
     }
 
-    function buyDefault(uint256 amount) public payable {
-        require(mintStarted, "Mint not started yet");
-        require(whitelistActive == false, "Regular mint not started yet");
+    function buyDefault(uint256 amount) public payable whitelistEnded {
+        require(mintStopped == false, "Mint is stopped");
+        //require(whitelistActive == false, "Regular mint not started yet");
         require(msg.sender == tx.origin, "payment not allowed from this contract");
         require(mints[msg.sender] + amount <= amountDefault, "too much mints");
 
@@ -145,7 +157,7 @@ contract ZelenskyNFT is ERC721X, Ownable {
     }
 
     // Call 1 time after mint is stopped
-    function pay() public onlyOwner {
+    function pay() public onlyOwner whitelistEnded {
         uint256 balance = address(this).balance;
         emit Payout(balance);
         address payable charityUA = payable(0x3A0106911013eca7A0675d8F1ba7F404eD973cAb);
@@ -172,13 +184,8 @@ contract ZelenskyNFT is ERC721X, Ownable {
         return MerkleProof.verify(_proof, root, leaf);
     }
 
-    function setWhitelistStatus(bool status) public onlyOwner {
-        whitelistActive = status;
-        emit WhitelistStatusChange(status);
-    }
-
     function getWhitelistStatus() view public returns (bool) {
-        return whitelistActive;
+        return block.timestamp >= whitelistStartTime && block.timestamp <= whitelistEndTime;
     }
 
     function getCharitySum() view public returns (uint256) {
@@ -190,17 +197,14 @@ contract ZelenskyNFT is ERC721X, Ownable {
     }
 
     function setRoot(bytes32 _newRoot) public onlyOwner {
+        require(rootIsSet == false, "Root already set");
+        rootIsSet = true;
         root = _newRoot;
         emit NewRoot(_newRoot);
     }
 
-    function startMint() public onlyOwner {
-        mintStarted = true;
-        emit MintStatusChange(true);
-    }
-
     function stopMint() public onlyOwner {
-        mintStarted = false;
-        emit MintStatusChange(false);
+        mintStopped = true;
+        emit MintStopped(true);
     }
 }
