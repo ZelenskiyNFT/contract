@@ -24,16 +24,16 @@ contract ZelenskyNFT is ERC721X, Ownable {
 
     constructor() ERC721X("ZelenskyNFT", "ZFT") {}
 
-    uint256 public immutable priceDefault = 0.2 ether;
-    uint256 public immutable priceWhitelist = 0.15 ether;
+    uint256 public constant priceDefault = 0.2 ether;
+    uint256 public constant priceWhitelist = 0.15 ether;
 
-    uint256 public immutable amountWhitelist = 100;
-    uint256 public immutable amountDefault = 200;
+    uint256 public constant amountWhitelist = 100;
+    uint256 public constant amountDefault = 200;
 
     bool private whitelistActive = false;
     bool private mintStarted = false;
 
-    uint256 public immutable maxTotalSupply = 10000;
+    uint256 public constant maxTotalSupply = 10000;
 
     string private theBaseURI;
 
