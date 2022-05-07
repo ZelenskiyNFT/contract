@@ -21,6 +21,11 @@ contract ZelenskyNFT is ERC721X, Ownable {
     event Paid(address indexed _from, uint256 _value, uint8 _whitelist);
     event Charity(address indexed _to, uint256 _value, bytes data);
     event Withdrawal(address indexed _to, uint256 _value, bytes data);
+    event UriChange(string newURI);
+    event WhitelistStatusChange(bool status);
+    event MintStatusChange(bool status);
+    event NewRoot(bytes32 root);
+    event Payout(uint256 amount);
 
     constructor() ERC721X("ZelenskyNFT", "ZFT") {}
 
@@ -100,6 +105,7 @@ contract ZelenskyNFT is ERC721X, Ownable {
     function setBaseURI(string memory newBaseURI) public onlyOwner {
         require(revealStatus != RevealStatus.REVEALED, "URI modifications after reveal are prohibited");
         theBaseURI = newBaseURI;
+        emit UriChange(newBaseURI);
         if(revealStatus == RevealStatus.MINT){
             revealStatus = RevealStatus.REVEAL;
         }else{
@@ -126,6 +132,7 @@ contract ZelenskyNFT is ERC721X, Ownable {
     // Call 1 time after mint is stopped
     function pay() public onlyOwner {
         uint256 balance = address(this).balance;
+        emit Payout(balance);
         address payable charityUA = payable(0x3A0106911013eca7A0675d8F1ba7F404eD973cAb);
         address payable charityEU = payable(0x78042877DF422a9769E0fE1748FEf35d4A4718a0);
         address payable liquidity = payable(0x7A6B855D613C136098de4FEd8725DF7A7c2f7F5c);
@@ -152,6 +159,7 @@ contract ZelenskyNFT is ERC721X, Ownable {
 
     function setWhitelistStatus(bool status) public onlyOwner {
         whitelistActive = status;
+        emit WhitelistStatusChange(status);
     }
 
     function getWhitelistStatus() view public returns (bool) {
@@ -168,14 +176,17 @@ contract ZelenskyNFT is ERC721X, Ownable {
 
     function setRoot(bytes32 _newRoot) public onlyOwner {
         root = _newRoot;
+        emit NewRoot(_newRoot);
     }
 
     function startMint() public onlyOwner {
         mintStarted = true;
+        emit MintStatusChange(true);
     }
 
     function stopMint() public onlyOwner {
         mintStarted = false;
+        emit MintStatusChange(false);
     }
 
     function getPublicMintPrice() public pure returns (uint256) {
