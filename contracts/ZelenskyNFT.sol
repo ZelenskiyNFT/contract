@@ -26,6 +26,7 @@ contract ZelenskyNFT is ERC721X, Ownable {
     event MintStatusChange(bool status);
     event NewRoot(bytes32 root);
     event Payout(uint256 amount);
+    event Refund(address indexed _to, uint256 amount, bytes data);
 
     constructor() ERC721X("ZelenskyNFT", "ZFT") {}
 
@@ -73,10 +74,17 @@ contract ZelenskyNFT is ERC721X, Ownable {
         price = priceWhitelist;
 
         require(msg.value >= price * amount, "Not enough eth");
+
+        if(msg.value > price * amount){
+            uint256 refundAmount = msg.value - price * amount;
+            (bool sent, bytes memory data) = msg.sender.call{value: refundAmount}("refund");
+            require(sent, "Refund failed");
+            emit Refund(msg.sender, refundAmount, data);
+        }
         
         mints[msg.sender] += amount;
 
-        saleSum += msg.value;
+        saleSum += price * amount;
 
         whitelistClaimed[msg.sender] = true;
 
@@ -95,9 +103,16 @@ contract ZelenskyNFT is ERC721X, Ownable {
 
         require(msg.value >= price * amount, "Not enough eth");
 
+        if(msg.value > price * amount){
+            uint256 refundAmount = msg.value - price * amount;
+            (bool sent, bytes memory data) = msg.sender.call{value: refundAmount}("refund");
+            require(sent, "Refund failed");
+            emit Refund(msg.sender, refundAmount, data);
+        }
+
         mints[msg.sender] += amount;
 
-        saleSum += msg.value;
+        saleSum += price * amount;
 
         _mint(msg.sender, amount);
     }
