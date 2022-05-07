@@ -27,6 +27,7 @@ contract ZelenskyNFT is ERC721X, Ownable {
     event NewRoot(bytes32 root);
     event Payout(uint256 amount);
     event Refund(address indexed _to, uint256 amount, bytes data);
+    event MintTimeSet(uint _start, uint _end);
 
     constructor() ERC721X("ZelenskyNFT", "ZFT") {}
 
@@ -206,5 +207,12 @@ contract ZelenskyNFT is ERC721X, Ownable {
     function stopMint() public onlyOwner {
         mintStopped = true;
         emit MintStopped(true);
+    }
+
+    function setMintTime(uint _start, uint _end) public onlyOwner {
+        require(whitelistStartTime == 0 && whitelistEndTime == 0, "Time is already set");
+        whitelistStartTime = _start;
+        whitelistEndTime = _end;
+        emit MintTimeSet(_start, _end);
     }
 }
