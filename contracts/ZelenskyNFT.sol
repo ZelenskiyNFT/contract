@@ -28,6 +28,7 @@ contract ZelenskyNFT is ERC721X, Ownable {
     event Payout(uint256 amount);
     event Refund(address indexed _to, uint256 amount, bytes data);
     event MintTimeSet(uint _start, uint _end);
+    event LockTimerStarted(uint _start, uint _end);
 
     constructor() ERC721X("ZelenskyNFT", "ZFT") {}
 
@@ -38,6 +39,7 @@ contract ZelenskyNFT is ERC721X, Ownable {
     uint256 public constant amountDefault = 3;
 
     uint256 public constant maxTotalSupply = 10000;
+    uint256 public constant communityMintSupply = 500;
 
     string private theBaseURI;
 
@@ -53,11 +55,13 @@ contract ZelenskyNFT is ERC721X, Ownable {
 
     RevealStatus revealStatus = RevealStatus.MINT;
 
-    uint private whitelistStartTime = 0;
-    uint private whitelistEndTime = 0;
-    uint private publicMintStartTime = 0;
+    uint private constant whitelistStartTime = 1654002000;
+    uint private constant whitelistEndTime = 1654081200;
+    uint private constant publicMintStartTime = 1654092000;
 
     bool private mintStopped = false;
+
+    uint private functionLockTime = 0;
 
     modifier whitelistActive() {
         require(whitelistStartTime != 0 && whitelistEndTime != 0, "Mint start time is not set");
@@ -116,7 +120,7 @@ contract ZelenskyNFT is ERC721X, Ownable {
         require(msg.sender == tx.origin, "payment not allowed from this contract");
         require(mints[msg.sender] + amount <= amountDefault, "too much mints for this wallet");
 
-        require(nextId + amount <= maxTotalSupply, "Maximum supply reached");
+        require(nextId + amount <= maxTotalSupply - communityMintSupply, "Maximum supply reached");
         uint256 price;
         price = priceDefault;
 
@@ -211,7 +215,14 @@ contract ZelenskyNFT is ERC721X, Ownable {
     }
 
     function stopMint() public onlyOwner {
-        mintStopped = true;
-        emit MintStopped(true);
+        if(functionLockTime == 0){
+            functionLockTime = block.timestamp;
+            emit LockTimerStarted(functionLockTime, functionLockTime + 1 hours);
+            return;
+        }else{
+            require(block.timestamp >= functionLockTime + 1 hours, "Hour not passed yet");
+            mintStopped = true;
+            emit MintStopped(true);
+        }
     }
 }
