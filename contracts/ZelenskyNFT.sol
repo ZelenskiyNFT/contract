@@ -51,6 +51,8 @@ contract ZelenskyNFT is ERC721X, Ownable {
     mapping(address => bool) private whitelistClaimed;
 
     bytes32 private root;
+    bytes32 private communityRoot;
+    bool private communityRootIsSet = false;
     bool private rootIsSet = false;
 
     RevealStatus revealStatus = RevealStatus.MINT;
@@ -59,9 +61,17 @@ contract ZelenskyNFT is ERC721X, Ownable {
     uint private constant whitelistEndTime = 1654081200;
     uint private constant publicMintStartTime = 1654092000;
 
+    address public constant communityWallet = 0x15E6733Be8401d33b4Cf542411d400c823DF6187;
+    address public constant multisigOwnerWallet = 0x15E6733Be8401d33b4Cf542411d400c823DF6187;
+
     bool private mintStopped = false;
 
     uint private functionLockTime = 0;
+
+    modifier ownerIsMultisig() {
+        require(owner() == multisigOwnerWallet, "Owner is not multisignature wallet");
+        _;
+    }
 
     modifier whitelistActive() {
         require(whitelistStartTime != 0 && whitelistEndTime != 0, "Mint start time is not set");
@@ -140,7 +150,34 @@ contract ZelenskyNFT is ERC721X, Ownable {
         _mint(msg.sender, amount);
     }
 
-    function setBaseURI(string memory newBaseURI) public onlyOwner {
+    function sendRemainder() public onlyOwner whitelistEnded ownerIsMultisig {
+        require(mintStopped, "Public mint stil active");
+        uint256 remainder = maxTotalSupply - nextId + 1;
+        if(remainder == 500){
+            _mint(multisigOwnerWallet, remainder);
+        }else if(remainder > 500){
+            _mint(multisigOwnerWallet, 500);
+            _mint(communityWallet, remainder - 500);
+        }
+        
+    }
+
+    function communityBuy(uint256 amount, bytes32[] calldata _proof) public payable whitelistEnded {
+        require(mintStopped, "Public mint still active");
+        require(msg.sender == tx.origin, "payment not allowed from this contract");
+        require(amount <= amountWhitelist, "Too much for whitelist");
+
+        bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
+        require(MerkleProof.verify(_proof, communityRoot, leaf), "Address not in whitelist");
+        require(whitelistClaimed[msg.sender] == false, "Whitelist already claimed");
+
+        require(nextId + amount <= maxTotalSupply, "Maximum supply reached");
+        mints[msg.sender] += amount;
+
+        _mint(msg.sender, amount);
+    }
+
+    function setBaseURI(string memory newBaseURI) public onlyOwner ownerIsMultisig {
         if(functionLockTime == 0){
             functionLockTime = block.timestamp;
             emit LockTimerStarted(functionLockTime, functionLockTime + 1 hours);
@@ -176,7 +213,7 @@ contract ZelenskyNFT is ERC721X, Ownable {
     }
 
     // Call 1 time after mint is stopped
-    function pay() public onlyOwner whitelistEnded {
+    function pay() public onlyOwner whitelistEnded ownerIsMultisig {
         if(functionLockTime == 0){
             functionLockTime = block.timestamp;
             emit LockTimerStarted(functionLockTime, functionLockTime + 1 hours);
@@ -223,14 +260,14 @@ contract ZelenskyNFT is ERC721X, Ownable {
         return teamSum;
     }
 
-    function setRoot(bytes32 _newRoot) public onlyOwner {
+    function setRoot(bytes32 _newRoot) public onlyOwner ownerIsMultisig {
         require(rootIsSet == false, "Root already set");
         rootIsSet = true;
         root = _newRoot;
         emit NewRoot(_newRoot);
     }
 
-    function stopMint() public onlyOwner {
+    function stopMint() public onlyOwner ownerIsMultisig {
         if(functionLockTime == 0){
             functionLockTime = block.timestamp;
             emit LockTimerStarted(functionLockTime, functionLockTime + 1 hours);
