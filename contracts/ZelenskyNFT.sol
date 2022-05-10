@@ -63,7 +63,7 @@ contract ZelenskyNFT is ERC721X, Ownable {
     uint public constant publicMintStartTime = 1654099200;
     uint public constant whitelist2StartTime = 1654189200;
 
-    address public constant communityWallet = 0x15E6733Be8401d33b4Cf542411d400c823DF6187;
+    address public constant communityWallet = 0x3b285ac109719d1a5ce41C79d09ed4302c2Aa56E;
     address public constant multisigOwnerWallet = 0x15E6733Be8401d33b4Cf542411d400c823DF6187;
 
     bool private mintStopped = false;
@@ -159,14 +159,9 @@ contract ZelenskyNFT is ERC721X, Ownable {
 
     function sendRemainder() public onlyOwner whitelistEnded ownerIsMultisig {
         require(mintStopped, "Public mint stil active");
-        uint256 remainder = maxTotalSupply - nextId + 1;
-        if(remainder == 500){
-            _mint(multisigOwnerWallet, remainder);
-        }else if(remainder > 500){
-            _mint(multisigOwnerWallet, 500);
-            _mint(communityWallet, remainder - 500);
-        }
-        
+        uint256 remainder = maxTotalSupply - communityMintSupply - nextId + 1;
+        require(remainder > 0);
+        _mint(communityWallet, remainder);
     }
 
     function communityBuy(uint256 amount, bytes32[] calldata _proof) public payable whitelist2Started {
