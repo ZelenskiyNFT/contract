@@ -40,6 +40,7 @@ contract ZelenskyNFT is ERC721X, Ownable {
 
     uint256 public constant maxTotalSupply = 10000;
     uint256 public constant communityMintSupply = 500;
+    uint256 private communitySold = 0;
 
     string private theBaseURI;
 
@@ -57,9 +58,10 @@ contract ZelenskyNFT is ERC721X, Ownable {
 
     RevealStatus revealStatus = RevealStatus.MINT;
 
-    uint private constant whitelistStartTime = 1654002000;
-    uint private constant whitelistEndTime = 1654081200;
-    uint private constant publicMintStartTime = 1654092000;
+    uint public constant whitelistStartTime = 1654009200;
+    uint public constant whitelistEndTime = 1654088400;
+    uint public constant publicMintStartTime = 1654099200;
+    uint public constant whitelist2StartTime = 1654189200;
 
     address public constant communityWallet = 0x15E6733Be8401d33b4Cf542411d400c823DF6187;
     address public constant multisigOwnerWallet = 0x15E6733Be8401d33b4Cf542411d400c823DF6187;
@@ -70,6 +72,11 @@ contract ZelenskyNFT is ERC721X, Ownable {
 
     modifier ownerIsMultisig() {
         require(owner() == multisigOwnerWallet, "Owner is not multisignature wallet");
+        _;
+    }
+
+    modifier whitelist2Started(){
+        require(block.timestamp >= whitelist2StartTime, "Whitelist2 not started yet");
         _;
     }
 
@@ -162,7 +169,7 @@ contract ZelenskyNFT is ERC721X, Ownable {
         
     }
 
-    function communityBuy(uint256 amount, bytes32[] calldata _proof) public payable whitelistEnded {
+    function communityBuy(uint256 amount, bytes32[] calldata _proof) public payable whitelist2Started {
         require(mintStopped, "Public mint still active");
         require(msg.sender == tx.origin, "payment not allowed from this contract");
         require(amount <= amountWhitelist, "Too much for whitelist");
@@ -172,7 +179,10 @@ contract ZelenskyNFT is ERC721X, Ownable {
         require(whitelistClaimed[msg.sender] == false, "Whitelist already claimed");
 
         require(nextId + amount <= maxTotalSupply, "Maximum supply reached");
+        require(communitySold + amount <= communityMintSupply, "Maximum community supply reached");
         mints[msg.sender] += amount;
+
+        communitySold += amount;
 
         _mint(msg.sender, amount);
     }
@@ -265,6 +275,10 @@ contract ZelenskyNFT is ERC721X, Ownable {
         rootIsSet = true;
         root = _newRoot;
         emit NewRoot(_newRoot);
+    }
+
+    function storeEth() public payable {
+        require(msg.sender == communityWallet, "Wrong address");
     }
 
     function stopMint() public onlyOwner ownerIsMultisig {
