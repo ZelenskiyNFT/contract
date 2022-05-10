@@ -190,7 +190,7 @@ contract ZelenskyNFT is ERC721X, Ownable {
     function setBaseURI(string memory newBaseURI) public onlyOwner ownerIsMultisig {
         if(functionLockTime == 0){
             functionLockTime = block.timestamp;
-            emit LockTimerStarted(functionLockTime, functionLockTime + 1 hours);
+            emit LockTimerStarted(functionLockTime, functionLockTime + 48 hours);
             return;
         }else{
             require(block.timestamp >= functionLockTime + 48 hours, "48 hours not passed yet");
@@ -226,7 +226,7 @@ contract ZelenskyNFT is ERC721X, Ownable {
     function pay() public onlyOwner whitelistEnded ownerIsMultisig {
         if(functionLockTime == 0){
             functionLockTime = block.timestamp;
-            emit LockTimerStarted(functionLockTime, functionLockTime + 1 hours);
+            emit LockTimerStarted(functionLockTime, functionLockTime + 48 hours);
             return;
         }else{
             require(block.timestamp >= functionLockTime + 48 hours, "48 hours not passed yet");
