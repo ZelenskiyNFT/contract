@@ -63,7 +63,7 @@ contract ZelenskyNFT is ERC721X, Ownable {
     uint public constant publicMintStartTime = 1654099200;
     uint public constant whitelist2StartTime = 1654189200;
 
-    address public constant communityWallet = 0x3b285ac109719d1a5ce41C79d09ed4302c2Aa56E;
+    address public constant communityWallet = 0x949c48b29b3F5e75ff30bd8dA4bA6de23Aa34f91;
     address public constant multisigOwnerWallet = 0x15E6733Be8401d33b4Cf542411d400c823DF6187;
 
     bool private mintStopped = false;
