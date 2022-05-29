@@ -30,7 +30,7 @@ contract ZelenskyNFT is ERC721X, Ownable {
     event MintTimeSet(uint _start, uint _end);
     event LockTimerStarted(uint _start, uint _end);
 
-    constructor() ERC721X("ZelenskyNFT", "ZFT") {}
+    constructor() ERC721X("ZelenskiyNFT", "ZFT") {}
 
     uint256 public constant priceDefault = 0.2 ether;
     uint256 public constant priceWhitelist = 0.15 ether;
