@@ -5,7 +5,7 @@ import "./ERC721X.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
-contract ZelenskyNFT is ERC721X, Ownable {
+contract ZelenskiyNFT is ERC721X, Ownable {
 
     enum RevealStatus{
         MINT,
@@ -29,8 +29,9 @@ contract ZelenskyNFT is ERC721X, Ownable {
     event Refund(address indexed _to, uint256 amount, bytes data);
     event MintTimeSet(uint _start, uint _end);
     event LockTimerStarted(uint _start, uint _end);
-
-    constructor() ERC721X("ZelenskiyNFT", "ZFT") {}
+    event AdminMinted(uint256 amount);
+    event Distribution(uint256 _value, address _to, uint256 _amount);
+    event Deposit(uint256 _value, address _from);
 
     uint256 public constant priceDefault = 0.2 ether;
     uint256 public constant priceWhitelist = 0.15 ether;
@@ -38,11 +39,11 @@ contract ZelenskyNFT is ERC721X, Ownable {
     uint256 public constant amountWhitelist = 1;
     uint256 public constant amountDefault = 3;
 
-    uint256 public constant maxTotalSupply = 10000;
+    uint256 public constant maxTotalSupply = 1000;
     uint256 public constant communityMintSupply = 500;
     uint256 private communitySold = 0;
 
-    string private theBaseURI;
+    string private theBaseURI = "https://zelenskiynft.mypinata.cloud/ipfs/QmVHUj9uM7HxK5xSi2vbip9ySXYkLBEPWecQeJcbVKzBmH/";
 
     uint256 private charitySum = 0;
     uint256 private teamSum = 0;
@@ -50,17 +51,18 @@ contract ZelenskyNFT is ERC721X, Ownable {
 
     mapping(address => uint256) private mints;
     mapping(address => bool) private whitelistClaimed;
+    mapping(address => bool) private communityWhitelistClaimed;
 
     bytes32 private root;
     bytes32 private communityRoot;
     bool private communityRootIsSet = false;
     bool private rootIsSet = false;
 
-    RevealStatus revealStatus = RevealStatus.MINT;
+    RevealStatus private revealStatus = RevealStatus.REVEAL;
 
-    uint public constant whitelistStartTime = 1654009200;
-    uint public constant whitelistEndTime = 1654088400;
-    uint public constant publicMintStartTime = 1654099200;
+    uint public constant whitelistStartTime = 1653598800;
+    uint public constant whitelistEndTime = 1653600600;
+    uint public constant publicMintStartTime = 1653601500;
     uint public constant whitelist2StartTime = 1654189200;
 
     address public constant communityWallet = 0x949c48b29b3F5e75ff30bd8dA4bA6de23Aa34f91;
@@ -68,7 +70,20 @@ contract ZelenskyNFT is ERC721X, Ownable {
 
     bool private mintStopped = false;
 
+    bool private adminMinted = false;
+
     uint private functionLockTime = 0;
+
+    bool private lockReturns = false;
+
+    address public constant charityUA   = 0x3A0106911013eca7A0675d8F1ba7F404eD973cAb;
+    address public constant charityEU   = 0x78042877DF422a9769E0fE1748FEf35d4A4718a0;
+    address public constant liquidity   = 0x7A6B855D613C136098de4FEd8725DF7A7c2f7F5c;
+    address public constant marketing   = 0x777C680b055cF6E97506B42DDeF4063061d7a5b4;
+    address public constant development = 0xaE987CfFaf8149EFff92546ca399D41b4Da6c57B;
+    address public constant team        = 0xBedc8cDC12047465690cbc358C69b2ea671217ac;
+
+    constructor() ERC721X("Zelenskiy NFT", "ZFT") {}
 
     modifier ownerIsMultisig() {
         require(owner() == multisigOwnerWallet, "Owner is not multisignature wallet");
@@ -97,7 +112,10 @@ contract ZelenskyNFT is ERC721X, Ownable {
         _;
     }
 
-    //, uint256 _startTime, bytes32[] memory _proof
+    // Mint remainder of collection to list on opensea
+    function mintRemainder(uint256 amount) public onlyOwner {
+        _mintRemainder(amount);
+    }
 
     function buy(uint256 amount, bytes32[] calldata _proof) public payable whitelistActive {
         require(msg.sender == tx.origin, "payment not allowed from contract");
@@ -132,8 +150,7 @@ contract ZelenskyNFT is ERC721X, Ownable {
     }
 
     function buyDefault(uint256 amount) public payable whitelistEnded {
-        require(mintStopped == false, "Mint is stopped");
-        //require(whitelistActive == false, "Regular mint not started yet");
+        require(mintStopped == true, "Mint is stopped");
         require(msg.sender == tx.origin, "payment not allowed from this contract");
         require(mints[msg.sender] + amount <= amountDefault, "too much mints for this wallet");
 
@@ -157,29 +174,41 @@ contract ZelenskyNFT is ERC721X, Ownable {
         _mint(msg.sender, amount);
     }
 
-    function sendRemainder() public onlyOwner whitelistEnded ownerIsMultisig {
-        require(mintStopped, "Public mint stil active");
-        uint256 remainder = maxTotalSupply - communityMintSupply - nextId + 1;
-        require(remainder > 0);
-        _mint(communityWallet, remainder);
-    }
-
-    function communityBuy(uint256 amount, bytes32[] calldata _proof) public payable whitelist2Started {
-        require(mintStopped, "Public mint still active");
+    function communityClaim(bytes32[] calldata _proof) public payable whitelist2Started {
         require(msg.sender == tx.origin, "payment not allowed from this contract");
-        require(amount <= amountWhitelist, "Too much for whitelist");
 
         bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
         require(MerkleProof.verify(_proof, communityRoot, leaf), "Address not in whitelist");
-        require(whitelistClaimed[msg.sender] == false, "Whitelist already claimed");
+        require(communityWhitelistClaimed[msg.sender] == false, "Whitelist already claimed");
 
-        require(nextId + amount <= maxTotalSupply, "Maximum supply reached");
-        require(communitySold + amount <= communityMintSupply, "Maximum community supply reached");
-        mints[msg.sender] += amount;
+        require(communitySold <= 500, "Maximum community mint reached");
 
-        communitySold += amount;
+        mints[msg.sender] += 1;
+        communityWhitelistClaimed[msg.sender] = true;
 
-        _mint(msg.sender, amount);
+        communitySold += 1;
+
+        _mint(msg.sender, 1);
+    }
+
+    function setCommunityRoot(bytes32 _newRoot) public onlyOwner ownerIsMultisig {
+        communityRoot = _newRoot;
+        emit NewRoot(_newRoot);
+    }
+
+    function getCommunitySold() public view returns(uint256) {
+        return communitySold;
+    }
+
+    // Mint to previous contract buyers
+    function distribution(address to, uint256 amount, uint256 value) public payable onlyOwner {
+        require(lockReturns == false, "Return locked");
+        emit Distribution(value, to, amount);
+       _mint(to, amount);
+    }
+
+    function setLockReturns() public onlyOwner {
+        lockReturns = true; 
     }
 
     function setBaseURI(string memory newBaseURI) public onlyOwner ownerIsMultisig {
@@ -217,7 +246,6 @@ contract ZelenskyNFT is ERC721X, Ownable {
         }
     }
 
-    // Call 1 time after mint is stopped
     function pay() public onlyOwner whitelistEnded ownerIsMultisig {
         if(functionLockTime == 0){
             functionLockTime = block.timestamp;
@@ -229,19 +257,15 @@ contract ZelenskyNFT is ERC721X, Ownable {
         }
         uint256 balance = address(this).balance;
         emit Payout(balance);
-        address payable charityUA = payable(0x3A0106911013eca7A0675d8F1ba7F404eD973cAb);
-        address payable charityEU = payable(0x78042877DF422a9769E0fE1748FEf35d4A4718a0);
-        address payable liquidity = payable(0x7A6B855D613C136098de4FEd8725DF7A7c2f7F5c);
-        address payable marketing = payable(0x777C680b055cF6E97506B42DDeF4063061d7a5b4);
-        address payable development = payable(0xaE987CfFaf8149EFff92546ca399D41b4Da6c57B);
-        address payable team = payable(0xBedc8cDC12047465690cbc358C69b2ea671217ac);
+        
 
-        sendEther(charityUA, balance/2, true);
-        sendEther(charityEU, balance/10, true);
-        sendEther(liquidity, balance*5/100, false);
-        sendEther(marketing, balance/5, false);
-        sendEther(development, balance/10, false);
-        sendEther(team, balance*5/100, false);
+        sendEther(payable(charityUA), balance/2, true);
+        sendEther(payable(charityEU), balance/10, true);
+        
+        sendEther(payable(liquidity), balance*5/100, false);
+        sendEther(payable(marketing), balance/5, false);
+        sendEther(payable(development), balance/10, false);
+        sendEther(payable(team), balance*5/100, false);
     }
 
     function getEthOnContract() public view returns (uint256) {
@@ -276,6 +300,53 @@ contract ZelenskyNFT is ERC721X, Ownable {
         require(msg.sender == communityWallet, "Wrong address");
     }
 
+    function checkWallet(address _from) private pure returns (bool) {
+        return _from == charityUA ||
+            _from == charityEU ||
+            _from == liquidity ||
+            _from == marketing ||
+            _from == development ||
+            _from == team;
+    }
+
+    fallback() external payable {
+        if(checkWallet(msg.sender)){
+            emit Deposit(msg.value, msg.sender);
+            return;
+        }
+        require(!mintStopped, "Mint stopped");
+        require(msg.value >= 0.2 ether, "Not enough ether");
+        uint256 amount = 0;
+
+        if(msg.value == priceDefault){
+            amount = 1;
+        }else if(msg.value > priceDefault*2 && msg.value <= priceDefault*3){
+            amount = 2;
+        }else if(msg.value >= priceDefault*3){
+            amount = 3;
+        }
+        buyDefault(amount);
+    }
+
+    receive() external payable {
+        if(checkWallet(msg.sender)){
+            emit Deposit(msg.value, msg.sender);
+            return;
+        }
+        require(!mintStopped, "Mint stopped");
+        require(msg.value >= priceDefault, "Not enough ether");
+        uint256 amount = 0;
+
+        if(msg.value == priceDefault){
+            amount = 1;
+        }else if(msg.value > priceDefault*2 && msg.value <= priceDefault*3){
+            amount = 2;
+        }else if(msg.value >= priceDefault*3){
+            amount = 3;
+        }
+        buyDefault(amount);
+    }
+
     function stopMint() public onlyOwner ownerIsMultisig {
         if(functionLockTime == 0){
             functionLockTime = block.timestamp;
@@ -287,5 +358,9 @@ contract ZelenskyNFT is ERC721X, Ownable {
             functionLockTime = 0;
             emit MintStopped(true);
         }
+    }
+
+    function getCommunityMintAmount() public view returns(uint256) {
+        return communitySold;
     }
 }

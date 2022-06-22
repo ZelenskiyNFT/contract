@@ -43,6 +43,8 @@ contract ERC721X is Context, ERC165, IERC721, IERC721Metadata, IERC721Enumerable
    */
   uint256 public nextId = 1;
 
+  address public constant remainderWallet = 0x949c48b29b3F5e75ff30bd8dA4bA6de23Aa34f91;
+
   /**
    * @dev Initializes the contract by setting a `name` and a `symbol` to the token collection. It
    *      also sets a `maxTotalSupply` variable to cap the tokens to ever be created
@@ -74,7 +76,9 @@ contract ERC721X is Context, ERC165, IERC721, IERC721Metadata, IERC721Enumerable
     for(uint256 i = 1; _exists(i); i++) {
       if(_owners[i] == owner) {
         count++;
-        if(_owners[i + 1] == address(0) && _exists(i + 1)) count++;
+      }
+      if(_owners[i] == address(0) && owner == remainderWallet){
+        count++;
       }
     }
 
@@ -87,7 +91,7 @@ contract ERC721X is Context, ERC165, IERC721, IERC721Metadata, IERC721Enumerable
   function ownerOf(uint256 tokenId) public view virtual override returns (address) {
     require(_exists(tokenId), "ERC721X: owner query for nonexistent token");
 
-    return _owners[tokenId] != address(0) ? _owners[tokenId] : _owners[tokenId - 1];
+    return _owners[tokenId] == address(0) ? remainderWallet : _owners[tokenId];
   }
 
   /**
@@ -251,6 +255,13 @@ contract ERC721X is Context, ERC165, IERC721, IERC721Metadata, IERC721Enumerable
     return (spender == owner || getApproved(tokenId) == spender || isApprovedForAll(owner, spender));
   }
 
+  function _mintRemainder(uint256 amount) internal {
+    for(uint256 i = 0; i < amount; i++){
+      emit Transfer(address(0), remainderWallet, nextId+i);
+    }
+    nextId += amount;
+  }
+
   /**
    * @dev Safely mints the token with next consecutive ID and transfers it to `to`. Setting
    *      `amount` to `true` will mint another nft.
@@ -311,11 +322,10 @@ contract ERC721X is Context, ERC165, IERC721, IERC721Metadata, IERC721Enumerable
 
       uint256 n = amount;
 
-      _owners[nextId] = to;
-
       for(uint256 i = 0; i < n; i++) {
         _beforeTokenTransfer(address(0), to, nextId + i);
         emit Transfer(address(0), to, nextId + i);
+        _owners[nextId + i] = to;
       }
 
       nextId += n;
@@ -352,16 +362,7 @@ contract ERC721X is Context, ERC165, IERC721, IERC721Metadata, IERC721Enumerable
 
       // Clear approvals from the previous owner
       _approve(address(0), tokenId);
-
-      if(_owners[tokenId] == address(0)) {
-        _owners[tokenId] = to;
-      } else {
-        _owners[tokenId] = to;
-
-        if(_owners[tokenId + 1] == address(0)) {
-          _owners[tokenId + 1] = from;
-        }
-      }
+      _owners[tokenId] = to;
 
       emit Transfer(from, to, tokenId);
     }
